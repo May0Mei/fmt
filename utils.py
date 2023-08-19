@@ -16,8 +16,9 @@ def visualize_result(map_design: np.ndarray, planner: FMTPlanner,
                      path_info: dict) -> None:
     plt.figure()
     plt.imshow(map_design, cmap="gray")
-    nx.draw(planner.graph, [x[::-1] for x in planner.node_list],
+    nx.draw_networkx(planner.graph, [x[::-1] for x in planner.node_list],
             node_size=1,
-            alpha=.5)
+            alpha=.5,
+            with_labels=False)
     path = path_info["path"]
     plt.plot(path[:, 1], path[:, 0], 'r-', lw=2)

@@ -57,7 +57,8 @@ class FMTPlanner():
     def plan(self,
              start: np.ndarray,
              goal: np.ndarray,
-             heuristic_weight: int = 0.0) -> dict:
+             heuristic_weight: int = 0.0,
+             optimistic: bool = False) -> dict:
         """
         Run path planning
 
@@ -103,24 +104,44 @@ class FMTPlanner():
                 N_x = node_tree.query_ball_point(self.node_list[x], self.r_n)
                 Y_near = list(set(N_x) & set(V_open))
                 y_min = Y_near[np.argmin([V_open[y] for y in Y_near])]
-                if self.check_collision(self.node_list[y_min],
-                                        self.node_list[x]):
-                    self.graph.add_edge(y_min, x)
-                    if x in V_open:
-                        V_open.updateitem(
-                            x, V_open[y_min] +
-                            np.linalg.norm(self.node_list[y_min] -
-                                           self.node_list[x]) +
-                            heuristic_weight *
-                            (-heuristic[y_min] + heuristic[x]))
-                    else:
-                        V_open.additem(
-                            x, V_open[y_min] +
-                            np.linalg.norm(self.node_list[y_min] -
-                                           self.node_list[x]) +
-                            heuristic_weight *
-                            (-heuristic[y_min] + heuristic[x]))
-                    V_unvisited.remove(x)
+                if optimistic: # only check collision for next time step
+                    if self.check_collision_next(self.node_list[y_min],
+                                            self.node_list[x]):
+                        self.graph.add_edge(y_min, x)
+                        if x in V_open:
+                            V_open.updateitem(
+                                x, V_open[y_min] +
+                                np.linalg.norm(self.node_list[y_min] -
+                                            self.node_list[x]) +
+                                heuristic_weight *
+                                (-heuristic[y_min] + heuristic[x]))
+                        else:
+                            V_open.additem(
+                                x, V_open[y_min] +
+                                np.linalg.norm(self.node_list[y_min] -
+                                            self.node_list[x]) +
+                                heuristic_weight *
+                                (-heuristic[y_min] + heuristic[x]))
+                        V_unvisited.remove(x)
+                else:
+                    if self.check_collision(self.node_list[y_min],
+                                            self.node_list[x]):
+                        self.graph.add_edge(y_min, x)
+                        if x in V_open:
+                            V_open.updateitem(
+                                x, V_open[y_min] +
+                                np.linalg.norm(self.node_list[y_min] -
+                                            self.node_list[x]) +
+                                heuristic_weight *
+                                (-heuristic[y_min] + heuristic[x]))
+                        else:
+                            V_open.additem(
+                                x, V_open[y_min] +
+                                np.linalg.norm(self.node_list[y_min] -
+                                            self.node_list[x]) +
+                                heuristic_weight *
+                                (-heuristic[y_min] + heuristic[x]))
+                        V_unvisited.remove(x)
             V_open.pop(z)
             V_closed.append(z)
             if len(V_open) == 0:
@@ -133,13 +154,41 @@ class FMTPlanner():
             for x in nx.shortest_path(self.graph, start_id, z)
         ])
 
+        p1 = np.delete(path,0,axis = 0)
+        p1 = np.vstack((p1,path[-1,:]))
+        cost = np.sum(np.linalg.norm(p1-path,axis = 1))
+
         return {
             "path": path,
             "n_steps": n_steps,
+            "cost": cost,
             "goal_flag": goal_flag,
         }
 
     def check_collision(self, src: np.ndarray, dst: np.ndarray) -> bool:
+        """
+        Check collision
+
+        Args:
+            src (np.ndarray): Source node
+            dst (np.ndarray): Destination node
+
+        Returns:
+            bool: True if no collisions were found and False otherwise
+        """
+        pr = self.path_resolution
+        if (dst is None) | np.all(src == dst):
+            return self.obstacles_tree.query(src)[0] > self.rr
+
+        dx, dy = dst[0] - src[0], dst[1] - src[1]
+        yaw = math.atan2(dy, dx)
+        d = math.hypot(dx, dy)
+        steps = np.arange(0, d, pr).reshape(-1, 1)
+        pts = src + steps * np.array([math.cos(yaw), math.sin(yaw)])
+        pts = np.vstack((pts, dst))
+        return bool(self.obstacles_tree.query(pts)[0].min() > self.rr)
+    
+    def check_collision_next(self, src: np.ndarray, dst: np.ndarray) -> bool:
         """
         Check collision
 
