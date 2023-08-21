@@ -105,7 +105,7 @@ class FMTPlanner():
                 Y_near = list(set(N_x) & set(V_open))
                 y_min = Y_near[np.argmin([V_open[y] for y in Y_near])]
                 if optimistic: # only check collision for next time step
-                    if self.check_collision_next(self.node_list[y_min],
+                    if self.check_collision(self.node_list[z],
                                             self.node_list[x]):
                         self.graph.add_edge(y_min, x)
                         if x in V_open:
@@ -188,25 +188,3 @@ class FMTPlanner():
         pts = np.vstack((pts, dst))
         return bool(self.obstacles_tree.query(pts)[0].min() > self.rr)
     
-    def check_collision_next(self, src: np.ndarray, dst: np.ndarray) -> bool:
-        """
-        Check collision
-
-        Args:
-            src (np.ndarray): Source node
-            dst (np.ndarray): Destination node
-
-        Returns:
-            bool: True if no collisions were found and False otherwise
-        """
-        pr = self.path_resolution
-        if (dst is None) | np.all(src == dst):
-            return self.obstacles_tree.query(src)[0] > self.rr
-
-        dx, dy = dst[0] - src[0], dst[1] - src[1]
-        yaw = math.atan2(dy, dx)
-        d = math.hypot(dx, dy)
-        steps = np.arange(0, d, pr).reshape(-1, 1)
-        pts = src + steps * np.array([math.cos(yaw), math.sin(yaw)])
-        pts = np.vstack((pts, dst))
-        return bool(self.obstacles_tree.query(pts)[0].min() > self.rr)
